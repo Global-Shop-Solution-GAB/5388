@@ -1,0 +1,141 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+	V.Global.sField.Declare
+	V.Global.sOperation.Declare
+	V.Global.sValue.Declare
+	V.Global.iDays.Declare
+	V.Global.sWorkOrder.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+	
+	F.ODBC.Connection!con.OpenCompanyConnection(300)
+	
+	F.Intrinsic.Control.CallSub(GetOptions)
+	F.Intrinsic.Control.CallSub(GetWorkOrders)
+	F.Intrinsic.Control.CallSub(UpdateDueDates)
+	
+	F.ODBC.Connection!con.Close
+
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.GetOptions.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+	
+'	0 - Boolean 
+'	1 - Long
+'	2 - Float
+'	3 - Date
+'	4 - Time
+'	5 - String
+
+	'Get Field
+	F.Global.Registry.ReadValue("SUPERVSR",V.Caller.CompanyCode,"5388",5388,1000,5,"",V.Global.sField)
+	'Get Operation
+	F.Global.Registry.ReadValue("SUPERVSR",V.Caller.CompanyCode,"5388",5388,1100,5,"",V.Global.sOperation)
+	'Get Value
+	F.Global.Registry.ReadValue("SUPERVSR",V.Caller.CompanyCode,"5388",5388,1200,5,"",V.Global.sValue)
+	'Get Days
+	F.Global.Registry.ReadValue("SUPERVSR",V.Caller.CompanyCode,"5388",5388,2000,1,"",V.Global.iDays)
+	
+	F.Intrinsic.Control.If(V.Global.sField,=,"")
+		F.ODBC.Connection!con.Close
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.GetOptions.End
+
+Program.Sub.GetWorkOrders.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+	
+	V.Local.sSQL.Declare
+	V.Local.sWHERE.Declare
+	V.Local.iCnt.Declare
+	
+	'Set WHERE
+	F.Intrinsic.Control.SelectCase(V.Global.sOperation)
+		F.Intrinsic.Control.Case("Equals")
+			F.Intrinsic.String.Build("WHERE A.{0} = '{1}'",V.Global.sField,V.Global.sValue,V.Local.sWHERE)
+			
+		F.Intrinsic.Control.Case("Does Not Equal")
+			F.Intrinsic.String.Build("WHERE A.{0} <> '{1}'",V.Global.sField,V.Global.sValue,V.Local.sWHERE)
+			
+		F.Intrinsic.Control.Case("Starts With")
+			F.Intrinsic.String.Build("WHERE A.{0} LIKE '{1}%'",V.Global.sField,V.Global.sValue,V.Local.sWHERE)
+			
+		F.Intrinsic.Control.Case("Ends With")
+			F.Intrinsic.String.Build("WHERE A.{0} LIKE '%{1}'",V.Global.sField,V.Global.sValue,V.Local.sWHERE)
+			
+	F.Intrinsic.Control.EndSelect
+	
+	'Load WOs
+	F.Intrinsic.String.Build("SELECT A.JOB+A.SUFFIX AS JS,A.JOB,A.SUFFIX FROM V_JOB_HEADER A LEFT JOIN GAB_5388_EXCL_WOS B ON A.JOB = B.JOB AND A.SUFFIX = B.SUFFIX {1} AND B.JOB IS NULL;", V.Screen.frmWO!txtPushDays.Text,V.Local.sWHERE,V.Local.sSQL)
+	F.Data.DataTable.CreateFromSQL("dtWOs","con",V.Local.sSQL,True)
+	
+	'Get Work Orders
+	F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtWOs.RowCount--,1)
+		F.Intrinsic.Control.If(V.Local.iCnt,=,0)
+			F.Intrinsic.String.Build("'{0}'",V.DataTable.dtWOs(V.Local.iCnt).JS!FieldVal,V.Global.sWorkOrder)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("{0},'{1}'",V.Global.sWorkOrder,V.DataTable.dtWOs(V.Local.iCnt).JS!FieldVal,V.Global.sWorkOrder)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iCnt)
+	
+	F.Data.DataTable.Close("dtWOs")
+	
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.GetWorkOrders.End
+
+Program.Sub.UpdateDueDates.Start
+	F.Intrinsic.Control.Try
+	V.Local.sError.Declare
+	
+	V.Local.sSQL.Declare
+	V.Local.dNewDueDate.Declare
+	
+	'JOB_HEADER
+	F.Intrinsic.String.Build("SELECT * FROM JOB_HEADER WHERE JOB+SUFFIX IN ({0});",V.Global.sWorkOrder,V.Local.sSQL)
+	F.Data.DataTable.CreateFromSQL("dtJobHeader","con",V.Local.sSQL,True)
+	'APSV3_JBMASTER
+	F.Intrinsic.String.Build("SELECT * FROM APSV3_JBMASTER WHERE JS IN ({0});",V.Global.sWorkOrder,V.Local.sSQL)
+	F.Data.DataTable.CreateFromSQL("dtAPS","con",V.Local.sSQL,True)
+	'Loop and push dates
+	F.Intrinsic.Date.DateAdd("D",V.Global.iDays,V.Ambient.Date,V.Local.dNewDueDate)
+	F.Data.DataTable.SetValue("dtJobHeader",-1,"DATE_DUE",V.Local.dNewDueDate.FormatMMDDYY)
+	F.Data.DataTable.SetValue("dtAPS",-1,"DUEDATE",V.Local.dNewDueDate)
+	'Save Data
+	F.Data.DataTable.SaveToDB("dtJobHeader","con","JOB_HEADER","JOB*!*SUFFIX")
+	F.Data.DataTable.SaveToDB("dtAPS","con","APSV3_JBMASTER","JS*!*SCENARIO*!*JOB*!*SFX")
+	'Close DataTables
+	F.Data.DataTable.Close("dtJobHeader")
+	F.Data.DataTable.Close("dtAPS")
+
+	F.Intrinsic.Control.Catch
+		F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End 
+	F.Intrinsic.Control.EndTry
+Program.Sub.UpdateDueDates.End
+
+Program.Sub.Comments.Start
+Program.Sub.Comments.End
